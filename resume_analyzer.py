@@ -316,47 +316,64 @@ class ResumeAnalyzer:
         return experience_section
     
     def extract_projects(self, text: str) -> List[str]:
-        """Extract structured project information"""
+        """Extract clean project names only"""
         projects_section = self.extract_section(text, 'projects')
         projects = []
         
         if projects_section:
-            # Look for project patterns with better parsing
+            # Split into potential project blocks
+            lines = projects_section.split('\n')
+            current_project = ""
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                # Check if this looks like a project title (not starting with bullet/algorithm/outcome)
+                if (not re.search(r'^(?:•|\*|-|\d+\.)', line) and
+                    not re.search(r'(?i)^(algorithms?|tools?|outcome|technologies?)', line) and
+                    len(line) > 10 and len(line) < 80):
+                    
+                    # This might be a project title
+                    current_project = line
+                    projects.append(current_project)
+                    
+                elif (re.search(r'^(?:•|\*|-)', line) and
+                      not re.search(r'(?i)(algorithms?|tools?|outcome)', line) and
+                      len(line) > 15 and len(line) < 80):
+                    
+                    # This might be a bulleted project title
+                    clean_project = re.sub(r'^(?:•|\*|-)\s*', '', line)
+                    if clean_project and not any(word in clean_project.lower() for word in ['algorithm', 'tool', 'outcome']):
+                        projects.append(clean_project)
+        
+        # Alternative: Look for capitalized project-like patterns
+        if not projects:
+            # Look for patterns like "Project Name Using Technology"
             project_patterns = [
-                r'(?i)([^•\n\*-]+?)\s*(?:•|\*|-|\n)\s*(?:algorithms?\s*&?\s*tools?:|technologies?:|tools?:)\s*([^•\n\*-]+?)(?=\s*(?:•|\*|-|\n|outcome:|$))',
-                r'(?i)^([^•\n\*-]+?)\s*(?:•|\*|-|\n)',
-                r'(?i)([A-Z][^•\n\*-]{10,50})\s*(?:•|\*|-)'
+                r'([A-Z][A-Za-z\s]+(?:Using|With|For|System|Application|Platform|Tool)[A-Za-z\s]*)',
+                r'([A-Z][A-Za-z\s]{15,60}(?:Management|Classification|Analysis|Detection|Evaluation)[A-Za-z\s]*)'
             ]
             
             for pattern in project_patterns:
-                matches = re.findall(pattern, projects_section, re.MULTILINE)
+                matches = re.findall(pattern, text)
                 for match in matches:
-                    if isinstance(match, tuple):
-                        project_name = match[0].strip()
-                    else:
-                        project_name = match.strip()
-                    
-                    # Clean project name
-                    project_name = re.sub(r'^[\d\.\)\s•\*-]+', '', project_name)
-                    project_name = project_name.strip()
-                    
-                    if (len(project_name) > 5 and len(project_name) < 100 and 
-                        not re.search(r'(?i)(algorithms?|tools?|outcome|technologies?)', project_name)):
-                        projects.append(project_name)
-            
-            # If no structured projects found, look for lines that might be project titles
-            if not projects:
-                lines = projects_section.split('\n')
-                for line in lines:
-                    line = line.strip()
-                    if (len(line) > 10 and len(line) < 80 and 
-                        not re.search(r'(?i)(algorithms?|tools?|outcome|technologies?|developed|created|built)', line)):
-                        # Remove bullet points and numbering
-                        clean_line = re.sub(r'^[\d\.\)\s•\*-]+', '', line)
-                        if clean_line.strip():
-                            projects.append(clean_line.strip())
+                    clean_match = match.strip()
+                    if len(clean_match) > 10 and len(clean_match) < 80:
+                        projects.append(clean_match)
         
-        return projects[:5]  # Limit to 5 projects
+        # Clean and deduplicate
+        cleaned_projects = []
+        for project in projects:
+            # Remove common prefixes/suffixes that aren't part of project name
+            project = re.sub(r'^(Project\s*:?\s*)', '', project, flags=re.IGNORECASE)
+            project = project.strip()
+            
+            if project and project not in cleaned_projects:
+                cleaned_projects.append(project)
+        
+        return cleaned_projects[:5]  # Limit to 5 projects
     
     def analyze_resume(self, file_path: str) -> Dict[str, Any]:
         """Main method to analyze resume"""

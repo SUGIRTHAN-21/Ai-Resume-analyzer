@@ -120,7 +120,10 @@ class ResumeAnalyzer {
                 <div class="info-section">
                     <h4>Professional Experience</h4>
                     <div class="info-content">
-                        ${experience ? this.escapeHtml(experience) : 'No work experience information found.'}
+                        ${experience ? 
+                            `<p>${this.formatExperience(experience)}</p>` : 
+                            '<p>The candidate appears to be seeking entry-level opportunities or has primarily academic experience.</p>'
+                        }
                     </div>
                 </div>
                 
@@ -142,8 +145,9 @@ class ResumeAnalyzer {
                 <div class="info-section">
                     <h4>Key Projects</h4>
                     <div class="info-content">
+                        <p>The candidate has worked on ${projects.length} notable project${projects.length > 1 ? 's' : ''}:</p>
                         <ul>
-                            ${projects.map(project => `<li>${this.escapeHtml(project)}</li>`).join('')}
+                            ${projects.map(project => `<li><strong>${this.escapeHtml(project)}</strong></li>`).join('')}
                         </ul>
                     </div>
                 </div>
@@ -206,6 +210,25 @@ class ResumeAnalyzer {
     hideResults() {
         this.resultsSection.style.display = 'none';
         this.resultsSection.classList.remove('show');
+    }
+
+    formatExperience(experience) {
+        // Clean up and summarize experience text
+        let cleaned = experience.replace(/\s+/g, ' ').trim();
+        
+        // If it's too long, provide a summary
+        if (cleaned.length > 200) {
+            cleaned = cleaned.substring(0, 200) + '...';
+        }
+        
+        // Add professional context if it looks like academic projects
+        if (cleaned.toLowerCase().includes('machine learning') || 
+            cleaned.toLowerCase().includes('project') || 
+            cleaned.toLowerCase().includes('academic')) {
+            return `The candidate has academic and project experience ${cleaned.toLowerCase()}`;
+        }
+        
+        return cleaned;
     }
 
     escapeHtml(text) {

@@ -35,13 +35,38 @@ class ResumeAnalyzer:
             r'(?i)\b(joining date|start date|reporting)\b'
         ]
         
-        # Common skill categories
+        # Comprehensive technical skills for tech industry
         self.skill_categories = {
-            'programming': ['python', 'java', 'javascript', 'c++', 'c#', 'php', 'ruby', 'go', 'rust', 'swift'],
-            'web': ['html', 'css', 'react', 'angular', 'vue', 'node.js', 'express', 'django', 'flask'],
-            'database': ['sql', 'mysql', 'postgresql', 'mongodb', 'oracle', 'sqlite', 'redis'],
-            'cloud': ['aws', 'azure', 'gcp', 'docker', 'kubernetes', 'jenkins'],
-            'tools': ['git', 'github', 'gitlab', 'jira', 'confluence', 'slack']
+            'programming_languages': [
+                'python', 'java', 'javascript', 'typescript', 'c++', 'c#', 'c', 'php', 'ruby', 'go', 'rust', 'swift', 
+                'kotlin', 'scala', 'r', 'matlab', 'perl', 'shell', 'bash', 'powershell'
+            ],
+            'web_technologies': [
+                'html', 'css', 'react', 'angular', 'vue', 'vue.js', 'node.js', 'express', 'django', 'flask', 
+                'spring', 'laravel', 'bootstrap', 'jquery', 'webpack', 'babel', 'sass', 'less'
+            ],
+            'databases': [
+                'sql', 'mysql', 'postgresql', 'mongodb', 'oracle', 'sqlite', 'redis', 'cassandra', 'elasticsearch', 
+                'dynamodb', 'neo4j', 'firebase', 'supabase'
+            ],
+            'cloud_devops': [
+                'aws', 'azure', 'gcp', 'google cloud', 'docker', 'kubernetes', 'jenkins', 'gitlab ci', 'github actions', 
+                'terraform', 'ansible', 'chef', 'puppet', 'vagrant', 'heroku', 'vercel', 'netlify'
+            ],
+            'data_science_ml': [
+                'tensorflow', 'pytorch', 'scikit-learn', 'pandas', 'numpy', 'matplotlib', 'seaborn', 'jupyter', 
+                'anaconda', 'spark', 'hadoop', 'kafka', 'airflow', 'machine learning', 'deep learning', 'nlp'
+            ],
+            'tools_frameworks': [
+                'git', 'github', 'gitlab', 'bitbucket', 'jira', 'confluence', 'slack', 'trello', 'asana', 
+                'figma', 'sketch', 'photoshop', 'illustrator', 'postman', 'swagger', 'rest api', 'graphql'
+            ],
+            'mobile_development': [
+                'android', 'ios', 'react native', 'flutter', 'xamarin', 'ionic', 'cordova', 'swift', 'objective-c', 'kotlin'
+            ],
+            'testing_qa': [
+                'selenium', 'cypress', 'jest', 'mocha', 'chai', 'pytest', 'junit', 'testng', 'cucumber', 'postman'
+            ]
         }
     
     def extract_text_pymupdf(self, file_path: str) -> str:
@@ -176,35 +201,72 @@ class ResumeAnalyzer:
         return "Candidate"
     
     def extract_skills(self, text: str) -> List[str]:
-        """Extract skills from resume text"""
+        """Extract only legitimate technical skills relevant to tech industry"""
         text_lower = text.lower()
         found_skills = []
         
+        # Create a comprehensive list of all technical skills
+        all_tech_skills = []
         for category, skills in self.skill_categories.items():
-            for skill in skills:
-                if skill in text_lower:
+            all_tech_skills.extend(skills)
+        
+        # Search for exact matches of technical skills in the text
+        for skill in all_tech_skills:
+            # Use word boundaries to match exact skills
+            pattern = rf'\b{re.escape(skill.lower())}\b'
+            if re.search(pattern, text_lower):
+                # Preserve original casing for known technical terms
+                if skill.lower() in ['html', 'css', 'sql', 'php', 'api', 'nlp', 'aws', 'gcp', 'ios']:
+                    found_skills.append(skill.upper())
+                elif skill.lower() in ['javascript', 'typescript', 'node.js', 'vue.js']:
+                    found_skills.append(skill)
+                else:
                     found_skills.append(skill.title())
         
-        # Also look for skills in dedicated skills section
-        skills_section = self.extract_section(text, 'skills')
-        if skills_section:
-            # Extract comma-separated skills
-            skill_matches = re.findall(r'\b[A-Za-z][A-Za-z0-9+#.]*\b', skills_section)
-            for skill in skill_matches:
-                if len(skill) > 2 and skill.lower() not in ['and', 'the', 'with', 'for']:
-                    found_skills.append(skill.title())
+        # Also check for specific technical patterns in the text
+        tech_patterns = [
+            r'\b(C\+\+|C#|\.NET|REST API|GraphQL)\b',
+            r'\b(Machine Learning|Deep Learning|Data Science|AI|ML|NLP)\b',
+            r'\b(React\.js|Angular\.js|Vue\.js|Node\.js)\b'
+        ]
         
-        return list(set(found_skills))  # Remove duplicates
+        for pattern in tech_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                found_skills.append(match)
+        
+        # Remove duplicates while preserving order
+        unique_skills = []
+        seen = set()
+        for skill in found_skills:
+            skill_lower = skill.lower()
+            if skill_lower not in seen:
+                unique_skills.append(skill)
+                seen.add(skill_lower)
+        
+        return unique_skills[:12]  # Limit to 12 most relevant technical skills
     
     def extract_section(self, text: str, section_name: str) -> str:
-        """Extract specific section content from resume"""
+        """Extract specific section content from resume with better formatting"""
         keywords = self.required_keywords.get(section_name, [section_name])
         
         for keyword in keywords:
-            pattern = rf'(?i){re.escape(keyword)}[:\s]*(.+?)(?=\n\s*[A-Z][A-Za-z\s]*:|$)'
-            match = re.search(pattern, text, re.DOTALL)
-            if match:
-                return match.group(1).strip()
+            # Try multiple patterns for better section extraction
+            patterns = [
+                rf'(?i){re.escape(keyword)}[:\s]*\n(.+?)(?=\n\s*[A-Z][A-Za-z\s]*\s*:|$)',
+                rf'(?i){re.escape(keyword)}[:\s]*(.+?)(?=\n\s*[A-Z][A-Za-z\s]*\s*:|$)',
+                rf'(?i){re.escape(keyword)}[:\s\n]*(.+?)(?=\n\n|\n[A-Z][A-Za-z\s]*\s*:|$)'
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, text, re.DOTALL)
+                if match:
+                    content = match.group(1).strip()
+                    # Clean up the content
+                    content = re.sub(r'\n\s*\n', '\n', content)  # Remove extra blank lines
+                    content = re.sub(r'\s+', ' ', content)  # Normalize whitespace
+                    if len(content) > 20:  # Only return if substantial content
+                        return content
         
         return ""
     
@@ -222,40 +284,77 @@ class ResumeAnalyzer:
         return education_section
     
     def extract_experience(self, text: str) -> str:
-        """Extract work experience information"""
+        """Extract and format work experience information"""
         experience_section = self.extract_section(text, 'experience')
         
         if not experience_section:
-            # Look for job title patterns
-            job_patterns = [
-                r'(?i)(developer|engineer|analyst|manager|coordinator|specialist|consultant)',
-                r'(?i)(senior|junior|lead|principal)\s+\w+',
-                r'\d{4}\s*[-–]\s*(?:\d{4}|present)'
-            ]
+            # Look for experience patterns in the entire text
+            lines = text.split('\n')
+            experience_lines = []
             
-            for pattern in job_patterns:
-                matches = re.findall(pattern, text)
-                if matches:
-                    experience_section = self.extract_section(text, 'work')
-                    break
+            for i, line in enumerate(lines):
+                line = line.strip()
+                # Look for job title patterns
+                if re.search(r'(?i)(developer|engineer|analyst|manager|coordinator|specialist|consultant|intern)', line):
+                    # Include this line and next few lines as context
+                    experience_lines.append(line)
+                    for j in range(i+1, min(i+4, len(lines))):
+                        if lines[j].strip() and len(lines[j].strip()) > 10:
+                            experience_lines.append(lines[j].strip())
+                        else:
+                            break
+            
+            if experience_lines:
+                experience_section = ' '.join(experience_lines)
         
+        # Format the experience section better
+        if experience_section:
+            # Remove excessive whitespace and format properly
+            experience_section = re.sub(r'\s+', ' ', experience_section)
+            experience_section = re.sub(r'([.!?])\s*', r'\1 ', experience_section)
+            
         return experience_section
     
     def extract_projects(self, text: str) -> List[str]:
-        """Extract project information"""
+        """Extract structured project information"""
         projects_section = self.extract_section(text, 'projects')
         projects = []
         
         if projects_section:
-            # Split by common project delimiters
-            project_lines = re.split(r'\n\s*(?=\d+\.|\•|\*|-)', projects_section)
-            for line in project_lines:
-                line = line.strip()
-                if line and len(line) > 10:  # Filter out short lines
-                    # Extract project name (usually the first part)
-                    project_name = line.split('\n')[0].strip()
-                    if project_name:
+            # Look for project patterns with better parsing
+            project_patterns = [
+                r'(?i)([^•\n\*-]+?)\s*(?:•|\*|-|\n)\s*(?:algorithms?\s*&?\s*tools?:|technologies?:|tools?:)\s*([^•\n\*-]+?)(?=\s*(?:•|\*|-|\n|outcome:|$))',
+                r'(?i)^([^•\n\*-]+?)\s*(?:•|\*|-|\n)',
+                r'(?i)([A-Z][^•\n\*-]{10,50})\s*(?:•|\*|-)'
+            ]
+            
+            for pattern in project_patterns:
+                matches = re.findall(pattern, projects_section, re.MULTILINE)
+                for match in matches:
+                    if isinstance(match, tuple):
+                        project_name = match[0].strip()
+                    else:
+                        project_name = match.strip()
+                    
+                    # Clean project name
+                    project_name = re.sub(r'^[\d\.\)\s•\*-]+', '', project_name)
+                    project_name = project_name.strip()
+                    
+                    if (len(project_name) > 5 and len(project_name) < 100 and 
+                        not re.search(r'(?i)(algorithms?|tools?|outcome|technologies?)', project_name)):
                         projects.append(project_name)
+            
+            # If no structured projects found, look for lines that might be project titles
+            if not projects:
+                lines = projects_section.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if (len(line) > 10 and len(line) < 80 and 
+                        not re.search(r'(?i)(algorithms?|tools?|outcome|technologies?|developed|created|built)', line)):
+                        # Remove bullet points and numbering
+                        clean_line = re.sub(r'^[\d\.\)\s•\*-]+', '', line)
+                        if clean_line.strip():
+                            projects.append(clean_line.strip())
         
         return projects[:5]  # Limit to 5 projects
     

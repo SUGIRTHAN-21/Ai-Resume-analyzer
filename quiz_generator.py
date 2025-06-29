@@ -6,39 +6,52 @@ class QuizGenerator:
     """Generates tailored interview questions based on resume analysis"""
     
     def __init__(self):
-        # Question templates for different categories
-        self.question_templates = {
-            'technical_skills': [
-                "Can you explain your experience with {skill} and how you've used it in your projects?",
-                "What challenges have you faced while working with {skill} and how did you overcome them?",
-                "How would you rate your proficiency in {skill} and what projects demonstrate this?",
-                "Describe a specific instance where {skill} was crucial to completing a project successfully.",
-                "What best practices do you follow when working with {skill}?"
+        # Diverse question pools for generating unique questions
+        self.question_generators = {
+            'technical_deep_dive': [
+                "Compare {skill1} and {skill2} - when would you choose one over the other?",
+                "If you had to teach {skill} to a junior developer, what would be your approach?",
+                "What's the most complex problem you've solved using {skill}?",
+                "How do you debug issues when working with {skill}?",
+                "What are the performance considerations when using {skill} in production?",
+                "Describe the learning curve you experienced with {skill}.",
+                "What libraries or frameworks complement {skill} in your workflow?"
             ],
-            'experience': [
-                "Tell me about your role as {position} and your key responsibilities.",
-                "What was your most significant achievement in your {position} role?",
-                "How did you handle challenges and deadlines in your {position} position?",
-                "What methodologies or processes did you implement in your {position} role?"
+            'project_specifics': [
+                "What inspired you to build {project}?",
+                "How did you validate the requirements for {project}?",
+                "What was your testing strategy for {project}?",
+                "How did you handle data management in {project}?",
+                "What performance optimizations did you implement in {project}?",
+                "How did you ensure user experience in {project}?",
+                "What security considerations did you address in {project}?"
             ],
-            'projects': [
-                "Walk me through the {project} project - what was your role and what technologies did you use?",
-                "What was the most challenging aspect of the {project} project and how did you solve it?",
-                "How did you ensure the quality and success of the {project} project?",
-                "What would you do differently if you were to restart the {project} project today?",
-                "Can you explain the architecture and technical decisions made in the {project} project?"
+            'problem_solving': [
+                "Describe a time when you had to learn a new technology quickly for a project.",
+                "How do you approach breaking down complex technical problems?",
+                "Tell me about a bug that took you the longest to fix.",
+                "How do you balance technical debt with feature development?",
+                "Describe your process for code reviews and quality assurance.",
+                "How do you handle conflicting technical requirements?",
+                "What's your approach to choosing between multiple technical solutions?"
             ],
-            'soft_skills': [
-                "How do you handle working under pressure and tight deadlines?",
-                "Describe a time when you had to work with a difficult team member.",
-                "How do you stay updated with the latest technologies and industry trends?",
-                "What motivates you to excel in your professional work?",
-                "How do you approach problem-solving when faced with a complex technical issue?"
+            'industry_knowledge': [
+                "What emerging technologies in your field excite you the most?",
+                "How do you evaluate new tools before adopting them in projects?",
+                "What's your perspective on current industry best practices?",
+                "How do you contribute to the developer community?",
+                "What resources do you use to stay current with technology trends?",
+                "How do you approach technical documentation and knowledge sharing?",
+                "What's your experience with agile development methodologies?"
             ],
-            'education': [
-                "How has your {degree} education prepared you for this role?",
-                "What was your favorite subject or project during your {degree} studies?",
-                "How do you apply the theoretical knowledge from your {degree} to practical work?"
+            'practical_scenarios': [
+                "How would you optimize a slow-performing application?",
+                "Describe your approach to building scalable systems.",
+                "How do you handle version control and collaboration in team projects?",
+                "What's your strategy for handling production incidents?",
+                "How do you approach API design and integration?",
+                "Describe your experience with cloud platforms and deployment.",
+                "How do you ensure accessibility in your applications?"
             ]
         }
     
@@ -194,72 +207,112 @@ class QuizGenerator:
         questions = random.sample(self.question_templates['soft_skills'], min(count, len(self.question_templates['soft_skills'])))
         return questions
     
-    def generate_questions(self, analysis_result: Dict[str, Any]) -> List[str]:
-        """Generate exactly 10 tailored interview questions"""
-        all_questions = []
-        
+    def generate_unique_questions(self, analysis_result: Dict[str, Any]) -> List[str]:
+        """Generate 10 completely unique and diverse interview questions"""
         skills = analysis_result.get('skills', [])
-        experience = analysis_result.get('experience', '')
         projects = analysis_result.get('projects', [])
-        education = analysis_result.get('education', '')
         
-        # Determine question distribution based on available content
-        total_questions = 10
+        all_questions = []
+        used_question_types = set()
         
-        # STRICT REQUIREMENT: Exactly 2 technical questions per project
-        project_questions = 0
+        # Generate exactly 2 unique questions per project
         if projects:
-            project_questions = len(projects) * 2  # Exactly 2 per project, no max limit
+            for project in projects[:3]:  # Max 3 projects for 6 questions
+                project_questions = self.generate_diverse_project_questions(project, used_question_types)
+                all_questions.extend(project_questions[:2])  # Exactly 2 per project
         
-        # Distribute remaining questions
-        remaining = max(0, total_questions - project_questions)
+        # Fill remaining slots with diverse technical and general questions
+        remaining_slots = 10 - len(all_questions)
         
-        # If projects take more than 10 questions, limit to first 5 projects (10 questions)
-        if project_questions > 10:
-            projects = projects[:5]  # Limit to 5 projects
-            project_questions = 10
-            remaining = 0
+        # Generate diverse skill-based questions
+        if skills and remaining_slots > 0:
+            skill_questions = self.generate_diverse_skill_questions(skills, remaining_slots // 2, used_question_types)
+            all_questions.extend(skill_questions)
+            remaining_slots = 10 - len(all_questions)
         
-        # Skills get priority for remaining questions
-        skill_questions = min(len(skills), max(0, remaining // 2)) if skills and remaining > 0 else 0
-        remaining -= skill_questions
+        # Fill any remaining slots with problem-solving and industry questions
+        if remaining_slots > 0:
+            general_questions = self.generate_diverse_general_questions(remaining_slots, used_question_types)
+            all_questions.extend(general_questions)
         
-        # Experience questions
-        experience_questions = min(2, remaining // 2) if experience and remaining > 0 else 0
-        remaining -= experience_questions
+        # Ensure exactly 10 questions
+        return all_questions[:10]
+    
+    def generate_diverse_project_questions(self, project: str, used_types: set) -> List[str]:
+        """Generate 2 completely different questions for a project"""
+        questions = []
+        available_categories = [cat for cat in ['project_specifics', 'technical_deep_dive', 'problem_solving'] 
+                               if cat not in used_types]
         
-        # Education questions
-        education_questions = min(1, remaining) if education and remaining > 0 else 0
-        remaining -= education_questions
+        if not available_categories:
+            available_categories = ['project_specifics', 'problem_solving']
         
-        # Soft skills fill the rest
-        soft_skill_questions = remaining
+        # Select 2 different question categories
+        selected_categories = random.sample(available_categories, min(2, len(available_categories)))
         
-        # Generate questions for each category
-        if project_questions > 0:
-            all_questions.extend(self.generate_project_questions(projects, project_questions))
+        for category in selected_categories:
+            question_templates = self.question_generators[category]
+            template = random.choice(question_templates)
+            
+            if '{project}' in template:
+                question = template.format(project=project)
+            else:
+                # For general templates, prefix with project context
+                question = f"Regarding your {project} project: {template}"
+            
+            questions.append(question)
+            used_types.add(category)
         
-        if skill_questions > 0:
-            all_questions.extend(self.generate_skill_questions(skills, skill_questions))
+        return questions
+    
+    def generate_diverse_skill_questions(self, skills: List[str], count: int, used_types: set) -> List[str]:
+        """Generate diverse skill-based questions"""
+        questions = []
         
-        if experience_questions > 0:
-            all_questions.extend(self.generate_experience_questions(experience, experience_questions))
+        for i in range(min(count, len(skills))):
+            skill = skills[i]
+            
+            # Choose from available question types
+            available_categories = [cat for cat in ['technical_deep_dive', 'practical_scenarios'] 
+                                   if cat not in used_types or len(used_types) > 3]
+            
+            if available_categories:
+                category = random.choice(available_categories)
+                templates = self.question_generators[category]
+                template = random.choice(templates)
+                
+                if '{skill}' in template:
+                    question = template.format(skill=skill)
+                elif '{skill1}' in template and len(skills) > 1:
+                    skill2 = random.choice([s for s in skills if s != skill])
+                    question = template.format(skill1=skill, skill2=skill2)
+                else:
+                    question = f"Considering your {skill} experience: {template}"
+                
+                questions.append(question)
+                used_types.add(category)
         
-        if education_questions > 0:
-            all_questions.extend(self.generate_education_questions(education, education_questions))
+        return questions
+    
+    def generate_diverse_general_questions(self, count: int, used_types: set) -> List[str]:
+        """Generate diverse general interview questions"""
+        questions = []
         
-        if soft_skill_questions > 0:
-            all_questions.extend(self.generate_soft_skill_questions(soft_skill_questions))
+        available_categories = [cat for cat in ['problem_solving', 'industry_knowledge', 'practical_scenarios'] 
+                               if cat not in used_types]
         
-        # Ensure we have exactly 10 questions
-        if len(all_questions) < 10:
-            # Add more soft skill questions if needed
-            additional_needed = 10 - len(all_questions)
-            additional_soft = self.generate_soft_skill_questions(additional_needed)
-            all_questions.extend(additional_soft)
-        elif len(all_questions) > 10:
-            # Trim to exactly 10 questions, preserving project questions
-            all_questions = all_questions[:10]
+        if not available_categories:
+            available_categories = ['problem_solving', 'industry_knowledge']
         
-        # Do NOT shuffle to maintain project question grouping
-        return all_questions
+        for i in range(count):
+            category = available_categories[i % len(available_categories)]
+            templates = self.question_generators[category]
+            template = random.choice(templates)
+            questions.append(template)
+            used_types.add(category)
+        
+        return questions
+    
+    def generate_questions(self, analysis_result: Dict[str, Any]) -> List[str]:
+        """Main method to generate questions - calls the new unique generator"""
+        return self.generate_unique_questions(analysis_result)

@@ -362,69 +362,54 @@ class ResumeAnalyzer:
         return experience_section
     
     def extract_projects(self, text: str) -> List[str]:
-        """Extract clean project names only"""
+        """Extract only complete, meaningful project names"""
         projects_section = self.extract_section(text, 'projects')
         projects = []
         
         if projects_section:
-            # Split into potential project blocks
-            lines = projects_section.split('\n')
-            current_project = ""
+            # Look for project titles that are complete sentences/phrases
+            # Split by common project separators and clean each potential project
+            project_blocks = re.split(r'\n(?=[A-Z])', projects_section)
             
-            for line in lines:
-                line = line.strip()
-                if not line:
+            for block in project_blocks:
+                lines = block.strip().split('\n')
+                if not lines:
                     continue
+                
+                # First line should be the project title
+                first_line = lines[0].strip()
+                
+                # Remove bullets and numbering
+                first_line = re.sub(r'^[\d\.\)\s•\*-]+', '', first_line)
+                first_line = first_line.strip()
+                
+                # Only accept if it's a complete project name
+                if (len(first_line) > 20 and len(first_line) < 100 and
+                    not re.search(r'(?i)^(algorithms?|tools?|outcome|technologies?)', first_line) and
+                    not any(word in first_line.lower() for word in ['department', 'college', 'university', 'academic projects'])):
                     
-                # Check if this looks like a project title (not starting with bullet/algorithm/outcome)
-                if (not re.search(r'^(?:•|\*|-|\d+\.)', line) and
-                    not re.search(r'(?i)^(algorithms?|tools?|outcome|technologies?)', line) and
-                    len(line) > 10 and len(line) < 80):
-                    
-                    # This might be a project title
-                    current_project = line
-                    projects.append(current_project)
-                    
-                elif (re.search(r'^(?:•|\*|-)', line) and
-                      not re.search(r'(?i)(algorithms?|tools?|outcome)', line) and
-                      len(line) > 15 and len(line) < 80):
-                    
-                    # This might be a bulleted project title
-                    clean_project = re.sub(r'^(?:•|\*|-)\s*', '', line)
-                    if clean_project and not any(word in clean_project.lower() for word in ['algorithm', 'tool', 'outcome']):
-                        projects.append(clean_project)
+                    # Check if it looks like a complete project title
+                    if (re.search(r'(?i)(system|application|platform|tool|analyzer|generator|classification|management|detection)', first_line) or
+                        re.search(r'(?i)using\s+(machine learning|ai|web|database)', first_line)):
+                        projects.append(first_line)
         
-        # Alternative: Look for specific project title patterns in full text
+        # If no good projects found from section, be very conservative
+        # Only return projects if we're confident they're real project names
         if not projects:
-            # Look for common project naming patterns
-            project_patterns = [
-                r'([A-Z][A-Za-z\s]+(?:Classification|Management|Analysis|Detection|System|Application|Platform|Analyzer|Generator)[A-Za-z\s]*)',
-                r'([A-Z][A-Za-z\s]+Using\s+[A-Z][A-Za-z\s]+)',
-                r'((?:Disease|Student|AI-Powered|Web-based|Real-time)\s+[A-Za-z\s]+(?:System|Application|Tool|Platform))'
-            ]
-            
-            for pattern in project_patterns:
-                matches = re.findall(pattern, text)
-                for match in matches:
-                    clean_match = match.strip()
-                    # Filter out department names and non-project text
-                    if (len(clean_match) > 15 and len(clean_match) < 80 and
-                        'department' not in clean_match.lower() and
-                        'college' not in clean_match.lower() and
-                        'university' not in clean_match.lower()):
-                        projects.append(clean_match)
+            # Don't extract anything rather than show wrong information
+            return []
         
-        # Clean and deduplicate
-        cleaned_projects = []
+        # Final validation - ensure each project makes sense
+        validated_projects = []
         for project in projects:
-            # Remove common prefixes/suffixes that aren't part of project name
-            project = re.sub(r'^(Project\s*:?\s*)', '', project, flags=re.IGNORECASE)
-            project = project.strip()
-            
-            if project and project not in cleaned_projects:
-                cleaned_projects.append(project)
+            # Must be a substantial project description
+            if (len(project) > 25 and 
+                not project.lower().startswith('academic') and
+                not project.lower().startswith('department') and
+                ' ' in project):  # Must have multiple words
+                validated_projects.append(project)
         
-        return cleaned_projects[:5]  # Limit to 5 projects
+        return validated_projects[:3]  # Limit to 3 most substantial projects
     
     def generate_candidate_summary(self, analysis_data: Dict[str, Any]) -> str:
         """Generate a comprehensive 7-8 line paragraph about the candidate"""

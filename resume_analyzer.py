@@ -161,25 +161,56 @@ class ResumeAnalyzer:
             'address': ''
         }
         
-        # Extract email
+        # Extract email with validation
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         email_match = re.search(email_pattern, text)
         if email_match:
-            contact_info['email'] = email_match.group()
+            email = email_match.group()
+            # Additional validation - ensure it's a reasonable email format
+            if len(email) > 5 and len(email) < 100 and email.count('@') == 1:
+                contact_info['email'] = email
         
-        # Extract phone
-        phone_pattern = r'(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}'
-        phone_match = re.search(phone_pattern, text)
-        if phone_match:
-            contact_info['phone'] = phone_match.group()
+        # Extract phone with better validation
+        phone_patterns = [
+            r'\+?1[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}',  # US format
+            r'\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}',  # Standard format
+            r'[0-9]{3}[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}'  # Basic format
+        ]
         
-        # Extract address (basic extraction)
-        lines = text.split('\n')
-        for line in lines[:10]:  # Check first 10 lines
-            line = line.strip()
-            if any(word in line.lower() for word in ['street', 'avenue', 'road', 'city', 'state']):
-                if len(line) > 10 and len(line) < 100:
-                    contact_info['address'] = line
+        for pattern in phone_patterns:
+            phone_match = re.search(pattern, text)
+            if phone_match:
+                phone = phone_match.group()
+                # Clean and validate the phone number
+                phone_digits = re.sub(r'[^\d]', '', phone)
+                
+                # Valid US phone numbers should have 10 or 11 digits
+                if len(phone_digits) == 10:
+                    # Format as (XXX) XXX-XXXX
+                    formatted_phone = f"({phone_digits[:3]}) {phone_digits[3:6]}-{phone_digits[6:]}"
+                    contact_info['phone'] = formatted_phone
+                    break
+                elif len(phone_digits) == 11 and phone_digits[0] == '1':
+                    # Format as +1 (XXX) XXX-XXXX
+                    formatted_phone = f"+1 ({phone_digits[1:4]}) {phone_digits[4:7]}-{phone_digits[7:]}"
+                    contact_info['phone'] = formatted_phone
+                    break
+        
+        # Extract address with better validation
+        address_patterns = [
+            r'([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd)[A-Za-z\s,]*)',
+            r'([A-Za-z\s]+,\s*[A-Z]{2}\s+[0-9]{5})',  # City, State ZIP
+            r'([A-Za-z\s]+[A-Z]{2}\s*[0-9]{5})'  # City State ZIP
+        ]
+        
+        for pattern in address_patterns:
+            address_match = re.search(pattern, text)
+            if address_match:
+                address = address_match.group().strip()
+                # Validate address format
+                if (len(address) > 15 and len(address) < 100 and
+                    not any(word in address.lower() for word in ['email', 'phone', 'linkedin', 'github'])):
+                    contact_info['address'] = address
                     break
         
         return contact_info

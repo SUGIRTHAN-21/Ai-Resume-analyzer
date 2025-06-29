@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Analyzer & Interview Question Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <header class="header">
+            <h1>Resume Analyzer & Interview Question Generator</h1>
+            <p>Upload a resume to analyze and generate tailored interview questions</p>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <form id="upload-form" enctype="multipart/form-data">
+                <div class="file-input-wrapper">
+                    <div class="file-input">
+                        <input type="file" id="resume-file" name="resume" accept=".pdf" required>
+                    </div>
+                    <button type="submit" id="analyze-btn" class="analyze-btn">
+                        <i class="fas fa-search"></i> Analyze Resume
+                    </button>
+                </div>
+                <div class="file-info">
+                    <p>* Only PDF files are supported</p>
+                    <p>* Maximum file size: 16MB</p>
+                </div>
+            </form>
+        </section>
+
+        <!-- Loading Section -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Analyzing resume content and generating questions...</p>
+        </div>
+
+        <!-- Error Message Section -->
+        <div id="error-message" class="error-message"></div>
+
+        <!-- Results Section -->
+        <section id="results-section" class="results-section">
+            <!-- Analysis Results -->
+            <div class="analysis-card">
+                <h2 class="card-title">
+                    <i class="fas fa-user-tie"></i> Candidate Analysis Report
+                </h2>
+                <div id="analysis-content"></div>
+            </div>
+
+            <!-- Interview Questions -->
+            <div class="questions-card">
+                <h2 class="card-title">
+                    <i class="fas fa-question-circle"></i> Tailored Interview Questions
+                </h2>
+                <div id="questions-content"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2025 Resume Analyzer | Powered by Gemini 1.5 Pro</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

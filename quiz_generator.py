@@ -143,18 +143,28 @@ class QuizGenerator:
         return questions
     
     def generate_project_questions(self, projects: List[str], count: int) -> List[str]:
-        """Generate questions based on projects"""
+        """Generate exactly 2 technical questions per project"""
         if not projects or count <= 0:
             return []
         
         questions = []
-        selected_projects = projects[:count]  # Take first 'count' projects
+        num_projects = count // 2  # Since we need 2 questions per project
+        selected_projects = projects[:num_projects]
         
         for project in selected_projects:
             clean_project = self.clean_project_name(project)
-            template = random.choice(self.question_templates['projects'])
-            question = template.format(project=clean_project)
-            questions.append(question)
+            
+            # Generate exactly 2 different technical questions per project
+            used_templates = []
+            for _ in range(2):
+                available_templates = [t for t in self.question_templates['projects'] if t not in used_templates]
+                if not available_templates:
+                    available_templates = self.question_templates['projects']
+                
+                template = random.choice(available_templates)
+                used_templates.append(template)
+                question = template.format(project=clean_project)
+                questions.append(question)
         
         return questions
     
@@ -196,24 +206,30 @@ class QuizGenerator:
         # Determine question distribution based on available content
         total_questions = 10
         
-        # Prioritize projects (minimum 2 questions per project if projects exist)
+        # STRICT REQUIREMENT: Exactly 2 technical questions per project
         project_questions = 0
         if projects:
-            project_questions = min(len(projects) * 2, 6)  # 2 per project, max 6
+            project_questions = len(projects) * 2  # Exactly 2 per project, no max limit
         
         # Distribute remaining questions
-        remaining = total_questions - project_questions
+        remaining = max(0, total_questions - project_questions)
         
-        # Skills get priority (3-4 questions)
-        skill_questions = min(len(skills), max(3, remaining // 2)) if skills else 0
+        # If projects take more than 10 questions, limit to first 5 projects (10 questions)
+        if project_questions > 10:
+            projects = projects[:5]  # Limit to 5 projects
+            project_questions = 10
+            remaining = 0
+        
+        # Skills get priority for remaining questions
+        skill_questions = min(len(skills), max(0, remaining // 2)) if skills and remaining > 0 else 0
         remaining -= skill_questions
         
-        # Experience questions (1-2 questions)
-        experience_questions = min(2, remaining // 2) if experience else 0
+        # Experience questions
+        experience_questions = min(2, remaining // 2) if experience and remaining > 0 else 0
         remaining -= experience_questions
         
-        # Education questions (1 question)
-        education_questions = min(1, remaining) if education else 0
+        # Education questions
+        education_questions = min(1, remaining) if education and remaining > 0 else 0
         remaining -= education_questions
         
         # Soft skills fill the rest
@@ -242,10 +258,8 @@ class QuizGenerator:
             additional_soft = self.generate_soft_skill_questions(additional_needed)
             all_questions.extend(additional_soft)
         elif len(all_questions) > 10:
-            # Trim to exactly 10 questions
+            # Trim to exactly 10 questions, preserving project questions
             all_questions = all_questions[:10]
         
-        # Shuffle questions for variety
-        random.shuffle(all_questions)
-        
+        # Do NOT shuffle to maintain project question grouping
         return all_questions

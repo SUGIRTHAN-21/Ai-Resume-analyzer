@@ -95,6 +95,12 @@ This is a Flask-based web application that analyzes PDF resumes and generates ta
 
 ## Changelog
 
+- June 29, 2025. Enhanced resume validation and analysis
+  - Added strict document type validation to reject non-resume documents (internship letters, offer letters)
+  - Implemented contact information extraction (email, phone, address)
+  - Enhanced candidate analysis report format with detailed sections
+  - Enforced exactly 2 technical questions per project in interview generation
+  - Improved resume section validation and error messaging
 - June 29, 2025. Initial setup
 
 ## User Preferences

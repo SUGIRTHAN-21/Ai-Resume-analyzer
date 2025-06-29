@@ -87,11 +87,28 @@ class ResumeAnalyzer {
     }
 
     displayAnalysis(analysis) {
-        const { candidate_name, skills, education, experience, projects } = analysis;
+        const { candidate_name, contact_info = {}, skills, education, experience, projects } = analysis;
         
         let html = `
             <div class="candidate-info">
                 <div class="candidate-name">${this.escapeHtml(candidate_name)}</div>
+                
+                <div class="info-section">
+                    <h4>Contact Details</h4>
+                    <div class="info-content">
+                        ${contact_info.email ? `<p><strong>Email:</strong> ${this.escapeHtml(contact_info.email)}</p>` : ''}
+                        ${contact_info.phone ? `<p><strong>Phone:</strong> ${this.escapeHtml(contact_info.phone)}</p>` : ''}
+                        ${contact_info.address ? `<p><strong>Address:</strong> ${this.escapeHtml(contact_info.address)}</p>` : ''}
+                        ${!contact_info.email && !contact_info.phone && !contact_info.address ? '<p>No contact information found.</p>' : ''}
+                    </div>
+                </div>
+                
+                <div class="info-section">
+                    <h4>Resume Analysis Report</h4>
+                    <div class="info-content">
+                        <p>This candidate's resume has been thoroughly analyzed for technical competencies, professional background, and project experience. The following sections provide a detailed breakdown of their qualifications and capabilities.</p>
+                    </div>
+                </div>
                 
                 <div class="info-section">
                     <h4>Education Background</h4>

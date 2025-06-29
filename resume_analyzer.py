@@ -16,6 +16,25 @@ class ResumeAnalyzer:
             'projects': ['projects', 'project', 'portfolio', 'work samples', 'achievements']
         }
         
+        # Resume validation patterns - documents should contain these patterns
+        self.resume_indicators = [
+            r'(?i)\b(resume|curriculum vitae|cv)\b',
+            r'(?i)\b(objective|summary|profile)\b',
+            r'(?i)\b(phone|email|contact|address)\b',
+            r'(?i)\b(bachelor|master|degree|university|college)\b',
+            r'(?i)\b(developer|engineer|analyst|manager|intern)\b',
+            r'(?i)\b(programming|software|web|technical)\b'
+        ]
+        
+        # Non-resume document indicators
+        self.non_resume_indicators = [
+            r'(?i)\b(internship letter|offer letter|appointment letter)\b',
+            r'(?i)\b(dear|congratulations|pleased to inform)\b',
+            r'(?i)\b(company letterhead|official letter)\b',
+            r'(?i)\b(terms and conditions|salary|compensation)\b',
+            r'(?i)\b(joining date|start date|reporting)\b'
+        ]
+        
         # Common skill categories
         self.skill_categories = {
             'programming': ['python', 'java', 'javascript', 'c++', 'c#', 'php', 'ruby', 'go', 'rust', 'swift'],
@@ -63,6 +82,41 @@ class ResumeAnalyzer:
         
         return text.strip()
     
+    def validate_document_type(self, text: str) -> Dict[str, Any]:
+        """Validate if document is actually a resume"""
+        text_lower = text.lower()
+        
+        # Check for non-resume indicators first
+        non_resume_matches = 0
+        for pattern in self.non_resume_indicators:
+            if re.search(pattern, text_lower):
+                non_resume_matches += 1
+        
+        # If too many non-resume indicators, reject
+        if non_resume_matches >= 2:
+            return {
+                'is_resume': False,
+                'reason': 'Document appears to be an offer letter, internship letter, or other official document, not a resume.'
+            }
+        
+        # Check for resume indicators
+        resume_matches = 0
+        for pattern in self.resume_indicators:
+            if re.search(pattern, text_lower):
+                resume_matches += 1
+        
+        # Need at least 3 resume indicators
+        if resume_matches < 3:
+            return {
+                'is_resume': False,
+                'reason': 'Document does not contain sufficient resume characteristics. Please upload a valid resume.'
+            }
+        
+        return {
+            'is_resume': True,
+            'resume_score': resume_matches
+        }
+    
     def validate_resume_sections(self, text: str) -> Dict[str, bool]:
         """Validate if resume contains required sections"""
         text_lower = text.lower()
@@ -74,6 +128,37 @@ class ResumeAnalyzer:
         
         return found_sections
     
+    def extract_contact_info(self, text: str) -> Dict[str, str]:
+        """Extract contact information from resume"""
+        contact_info = {
+            'email': '',
+            'phone': '',
+            'address': ''
+        }
+        
+        # Extract email
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        email_match = re.search(email_pattern, text)
+        if email_match:
+            contact_info['email'] = email_match.group()
+        
+        # Extract phone
+        phone_pattern = r'(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}'
+        phone_match = re.search(phone_pattern, text)
+        if phone_match:
+            contact_info['phone'] = phone_match.group()
+        
+        # Extract address (basic extraction)
+        lines = text.split('\n')
+        for line in lines[:10]:  # Check first 10 lines
+            line = line.strip()
+            if any(word in line.lower() for word in ['street', 'avenue', 'road', 'city', 'state']):
+                if len(line) > 10 and len(line) < 100:
+                    contact_info['address'] = line
+                    break
+        
+        return contact_info
+    
     def extract_name(self, text: str) -> str:
         """Extract candidate name from resume"""
         lines = text.split('\n')
@@ -83,9 +168,9 @@ class ResumeAnalyzer:
             line = line.strip()
             if line and len(line.split()) <= 4:  # Names are usually 1-4 words
                 # Filter out common non-name patterns
-                if not any(word in line.lower() for word in ['email', 'phone', 'address', 'resume', 'cv']):
+                if not any(word in line.lower() for word in ['email', 'phone', 'address', 'resume', 'cv', '@', 'http']):
                     # Check if it looks like a name (contains alphabetic characters)
-                    if re.search(r'[a-zA-Z]', line):
+                    if re.search(r'^[A-Za-z\s\.]+$', line) and len(line) > 2:
                         return line
         
         return "Candidate"
@@ -186,6 +271,14 @@ class ResumeAnalyzer:
                     'error_message': 'Unable to extract text from PDF. Please ensure the file is not corrupted or password-protected.'
                 }
             
+            # First validate if document is actually a resume
+            doc_validation = self.validate_document_type(text)
+            if not doc_validation['is_resume']:
+                return {
+                    'is_valid': False,
+                    'error_message': f'Please enter a valid resume only. {doc_validation["reason"]}'
+                }
+            
             # Validate required sections
             sections = self.validate_resume_sections(text)
             missing_sections = [section for section, found in sections.items() if not found]
@@ -198,6 +291,7 @@ class ResumeAnalyzer:
             
             # Extract information
             name = self.extract_name(text)
+            contact_info = self.extract_contact_info(text)
             skills = self.extract_skills(text)
             education = self.extract_education(text)
             experience = self.extract_experience(text)
@@ -206,6 +300,7 @@ class ResumeAnalyzer:
             return {
                 'is_valid': True,
                 'candidate_name': name,
+                'contact_info': contact_info,
                 'skills': skills,
                 'education': education,
                 'experience': experience,

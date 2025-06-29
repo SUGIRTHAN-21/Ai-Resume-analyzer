@@ -170,48 +170,63 @@ class ResumeAnalyzer:
             if len(email) > 5 and len(email) < 100 and email.count('@') == 1:
                 contact_info['email'] = email
         
-        # Extract phone with better validation
+        # Extract phone with VERY strict validation - only show if we're 100% certain
         phone_patterns = [
-            r'\+?1[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}',  # US format
-            r'\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}',  # Standard format
-            r'[0-9]{3}[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}'  # Basic format
+            r'\+\s*91\s+[0-9]{10}',  # Indian format with +91
+            r'\+91[0-9]{10}',  # Indian format without space
+            r'\+1\s*\([0-9]{3}\)\s*[0-9]{3}[-\s]?[0-9]{4}',  # US format with +1
+            r'\([0-9]{3}\)\s*[0-9]{3}[-\s]?[0-9]{4}',  # US format without country code
         ]
         
         for pattern in phone_patterns:
             phone_match = re.search(pattern, text)
             if phone_match:
-                phone = phone_match.group()
-                # Clean and validate the phone number
-                phone_digits = re.sub(r'[^\d]', '', phone)
-                
-                # Valid US phone numbers should have 10 or 11 digits
-                if len(phone_digits) == 10:
-                    # Format as (XXX) XXX-XXXX
-                    formatted_phone = f"({phone_digits[:3]}) {phone_digits[3:6]}-{phone_digits[6:]}"
-                    contact_info['phone'] = formatted_phone
-                    break
-                elif len(phone_digits) == 11 and phone_digits[0] == '1':
-                    # Format as +1 (XXX) XXX-XXXX
-                    formatted_phone = f"+1 ({phone_digits[1:4]}) {phone_digits[4:7]}-{phone_digits[7:]}"
-                    contact_info['phone'] = formatted_phone
-                    break
+                phone = phone_match.group().strip()
+                # Extract only digits and country code
+                if '+91' in phone:
+                    # Indian number - extract digits after +91
+                    digits = re.sub(r'[^\d]', '', phone.replace('+91', ''))
+                    if len(digits) == 10 and digits[0] in '6789':  # Valid Indian mobile starts with 6,7,8,9
+                        contact_info['phone'] = f"+91 {digits}"
+                        break
+                elif '+1' in phone:
+                    # US number - extract digits after +1
+                    digits = re.sub(r'[^\d]', '', phone.replace('+1', ''))
+                    if len(digits) == 10:
+                        contact_info['phone'] = f"+1 ({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+                        break
+                else:
+                    # No country code - be very conservative
+                    digits = re.sub(r'[^\d]', '', phone)
+                    if len(digits) == 10 and digits[0] in '6789':  # Assume Indian if starts with 6,7,8,9
+                        contact_info['phone'] = f"+91 {digits}"
+                        break
+                    elif len(digits) == 10 and digits[0] in '2345':  # Assume US if starts with 2,3,4,5
+                        contact_info['phone'] = f"+1 ({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+                        break
         
-        # Extract address with better validation
+        # If no clear phone pattern found, don't extract anything
+        
+        # Extract address - ONLY if very clear address patterns
+        # Be extremely conservative - only extract if we're 100% sure it's an address
         address_patterns = [
-            r'([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd)[A-Za-z\s,]*)',
-            r'([A-Za-z\s]+,\s*[A-Z]{2}\s+[0-9]{5})',  # City, State ZIP
-            r'([A-Za-z\s]+[A-Z]{2}\s*[0-9]{5})'  # City State ZIP
+            r'([0-9]+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd),?\s*[A-Za-z\s]+,\s*[A-Z]{2}\s+[0-9]{5})',
+            r'([A-Za-z\s]+,\s*[A-Z]{2}\s+[0-9]{5}-[0-9]{4})',  # City, State ZIP+4
         ]
         
         for pattern in address_patterns:
             address_match = re.search(pattern, text)
             if address_match:
                 address = address_match.group().strip()
-                # Validate address format
-                if (len(address) > 15 and len(address) < 100 and
-                    not any(word in address.lower() for word in ['email', 'phone', 'linkedin', 'github'])):
+                # Very strict validation - must be clearly an address
+                if (len(address) > 20 and len(address) < 80 and
+                    ',' in address and  # Must have comma separators
+                    re.search(r'[0-9]{5}', address) and  # Must have ZIP code
+                    not any(word in address.lower() for word in ['email', 'phone', 'linkedin', 'github', 'http', '@'])):
                     contact_info['address'] = address
                     break
+        
+        # If no clear address found, don't show anything rather than wrong info
         
         return contact_info
     

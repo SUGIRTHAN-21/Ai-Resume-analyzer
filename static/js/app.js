@@ -87,7 +87,7 @@ class ResumeAnalyzer {
     }
 
     displayAnalysis(analysis) {
-        const { candidate_name, contact_info = {}, skills, education, experience, projects } = analysis;
+        const { candidate_name, contact_info = {}, skills, education, experience, projects, candidate_summary } = analysis;
         
         let html = `
             <div class="candidate-info">
@@ -104,9 +104,12 @@ class ResumeAnalyzer {
                 </div>
                 
                 <div class="info-section">
-                    <h4>Resume Analysis Report</h4>
+                    <h4>Candidate Summary</h4>
                     <div class="info-content">
-                        <p>This candidate's resume has been thoroughly analyzed for technical competencies, professional background, and project experience. The following sections provide a detailed breakdown of their qualifications and capabilities.</p>
+                        ${candidate_summary ? 
+                            `<p>${this.escapeHtml(candidate_summary)}</p>` : 
+                            '<p>This candidate\'s resume has been thoroughly analyzed for technical competencies, professional background, and project experience. The following sections provide a detailed breakdown of their qualifications and capabilities.</p>'
+                        }
                     </div>
                 </div>
                 
@@ -141,17 +144,28 @@ class ResumeAnalyzer {
         `;
 
         if (projects && projects.length > 0) {
-            html += `
-                <div class="info-section">
-                    <h4>Key Projects</h4>
-                    <div class="info-content">
-                        <p>The candidate has worked on ${projects.length} notable project${projects.length > 1 ? 's' : ''}:</p>
-                        <ul>
-                            ${projects.map(project => `<li><strong>${this.escapeHtml(project)}</strong></li>`).join('')}
-                        </ul>
+            // Filter out invalid project entries
+            const validProjects = projects.filter(project => 
+                project && 
+                project.length > 5 && 
+                !project.toLowerCase().includes('department') &&
+                !project.toLowerCase().includes('college') &&
+                !project.toLowerCase().includes('university')
+            );
+            
+            if (validProjects.length > 0) {
+                html += `
+                    <div class="info-section">
+                        <h4>Key Projects</h4>
+                        <div class="info-content">
+                            <p>Notable projects completed by the candidate:</p>
+                            <ul>
+                                ${validProjects.map(project => `<li><strong>${this.escapeHtml(project)}</strong></li>`).join('')}
+                            </ul>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
         }
 
         html += '</div>';

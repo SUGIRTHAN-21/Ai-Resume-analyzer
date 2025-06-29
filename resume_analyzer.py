@@ -348,19 +348,24 @@ class ResumeAnalyzer:
                     if clean_project and not any(word in clean_project.lower() for word in ['algorithm', 'tool', 'outcome']):
                         projects.append(clean_project)
         
-        # Alternative: Look for capitalized project-like patterns
+        # Alternative: Look for specific project title patterns in full text
         if not projects:
-            # Look for patterns like "Project Name Using Technology"
+            # Look for common project naming patterns
             project_patterns = [
-                r'([A-Z][A-Za-z\s]+(?:Using|With|For|System|Application|Platform|Tool)[A-Za-z\s]*)',
-                r'([A-Z][A-Za-z\s]{15,60}(?:Management|Classification|Analysis|Detection|Evaluation)[A-Za-z\s]*)'
+                r'([A-Z][A-Za-z\s]+(?:Classification|Management|Analysis|Detection|System|Application|Platform|Analyzer|Generator)[A-Za-z\s]*)',
+                r'([A-Z][A-Za-z\s]+Using\s+[A-Z][A-Za-z\s]+)',
+                r'((?:Disease|Student|AI-Powered|Web-based|Real-time)\s+[A-Za-z\s]+(?:System|Application|Tool|Platform))'
             ]
             
             for pattern in project_patterns:
                 matches = re.findall(pattern, text)
                 for match in matches:
                     clean_match = match.strip()
-                    if len(clean_match) > 10 and len(clean_match) < 80:
+                    # Filter out department names and non-project text
+                    if (len(clean_match) > 15 and len(clean_match) < 80 and
+                        'department' not in clean_match.lower() and
+                        'college' not in clean_match.lower() and
+                        'university' not in clean_match.lower()):
                         projects.append(clean_match)
         
         # Clean and deduplicate
@@ -374,6 +379,62 @@ class ResumeAnalyzer:
                 cleaned_projects.append(project)
         
         return cleaned_projects[:5]  # Limit to 5 projects
+    
+    def generate_candidate_summary(self, analysis_data: Dict[str, Any]) -> str:
+        """Generate a comprehensive 7-8 line paragraph about the candidate"""
+        name = analysis_data.get('candidate_name', 'The candidate')
+        skills = analysis_data.get('skills', [])
+        education = analysis_data.get('education', '')
+        experience = analysis_data.get('experience', '')
+        projects = analysis_data.get('projects', [])
+        
+        # Build summary components
+        summary_parts = []
+        
+        # Introduction
+        summary_parts.append(f"{name} is a dedicated professional with a strong foundation in technology and programming.")
+        
+        # Education background
+        if education:
+            if 'bachelor' in education.lower() or 'master' in education.lower():
+                summary_parts.append(f"The candidate holds relevant academic qualifications in computer science or related fields, providing a solid theoretical foundation.")
+            else:
+                summary_parts.append(f"The candidate has pursued formal education in technology and computer applications.")
+        else:
+            summary_parts.append(f"The candidate demonstrates strong self-learning capabilities in technology domains.")
+        
+        # Technical skills
+        if skills:
+            primary_skills = skills[:5]  # Top 5 skills
+            skills_text = ', '.join(primary_skills[:-1]) + f" and {primary_skills[-1]}" if len(primary_skills) > 1 else primary_skills[0]
+            summary_parts.append(f"Their technical expertise includes proficiency in {skills_text}, demonstrating versatility across multiple technology stacks.")
+        
+        # Projects and interests
+        if projects:
+            if len(projects) >= 2:
+                summary_parts.append(f"The candidate has successfully completed {len(projects)} notable projects, including {projects[0]} and {projects[1]}, showcasing practical application of technical skills.")
+            else:
+                summary_parts.append(f"The candidate has worked on meaningful projects including {projects[0]}, demonstrating hands-on development experience.")
+            
+            # Analyze project domains for interests
+            project_text = ' '.join(projects).lower()
+            if 'machine learning' in project_text or 'ai' in project_text:
+                summary_parts.append("Their work shows particular interest in artificial intelligence and machine learning technologies.")
+            elif 'web' in project_text or 'application' in project_text:
+                summary_parts.append("Their focus appears to be on web development and application building.")
+            else:
+                summary_parts.append("Their project portfolio demonstrates diverse technical interests and problem-solving capabilities.")
+        else:
+            summary_parts.append("The candidate shows enthusiasm for learning and applying new technologies in practical scenarios.")
+        
+        # Professional outlook
+        if 'intern' in experience.lower() or not experience:
+            summary_parts.append("As an emerging professional, they are eager to contribute to challenging projects and grow within a dynamic technology environment.")
+        else:
+            summary_parts.append("With their combination of technical skills and practical experience, they are well-positioned to contribute effectively to technology teams.")
+        
+        # Join all parts into a cohesive paragraph
+        return ' '.join(summary_parts)
     
     def analyze_resume(self, file_path: str) -> Dict[str, Any]:
         """Main method to analyze resume"""
@@ -413,7 +474,8 @@ class ResumeAnalyzer:
             experience = self.extract_experience(text)
             projects = self.extract_projects(text)
             
-            return {
+            # Prepare analysis data
+            analysis_data = {
                 'is_valid': True,
                 'candidate_name': name,
                 'contact_info': contact_info,
@@ -424,6 +486,11 @@ class ResumeAnalyzer:
                 'sections_found': sections,
                 'full_text': text
             }
+            
+            # Generate comprehensive candidate summary
+            analysis_data['candidate_summary'] = self.generate_candidate_summary(analysis_data)
+            
+            return analysis_data
             
         except Exception as e:
             logging.error(f"Error analyzing resume: {str(e)}")
